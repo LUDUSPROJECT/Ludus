@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ludus</title>
+    <title>Mesa de RPG Virtual</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -113,7 +113,8 @@
         @keyframes shake-lg { 0%, 100% { transform: translate(0, 0) rotate(0); } 40% { transform: translate(-10px, 5px) rotate(-5deg); } 80% { transform: translate(10px, -5px) rotate(5deg); } }
         .shake-lg { animation: shake-lg 0.3s infinite; }
         
-        /* Efeito de Movimento: Glitch */
+        /* Efeito de Movimento: Glitch (REMOVIDO) */
+        /*
         @keyframes glitch-anim {
           0% { transform: translate(0); clip-path: inset(0); }
           5% { transform: translate(-2px, 2px); clip-path: inset(10% 0 85% 0); }
@@ -125,9 +126,9 @@
           100% { transform: translate(0); clip-path: inset(0); }
         }
         .glitch-active {
-          /* Aplicado ao token, mas as camadas filhas fazem o clip-path */
           animation: glitch-anim 2s infinite linear alternate-reverse;
         }
+        */
 
         /* Camada de Imagem (para máscara) */
         .token-image-layer {
@@ -145,6 +146,7 @@
         .glitch-active .token-image-layer {
             clip-path: inherit; /* Herda o clip-path do token pai */
         }
+        */
 
 
         /* Camada de Luz Interna (para máscara) */
@@ -162,6 +164,7 @@
         .glitch-active .token-light-overlay {
             clip-path: inherit; /* Herda o clip-path do token pai */
         }
+        */
         
         /* Camada de Animação/Efeito (ex: fogo) */
         .token-overlay {
@@ -180,6 +183,7 @@
         .glitch-active .token-overlay {
             clip-path: inherit; /* Herda o clip-path do token pai */
         }
+        */
 
         
         /* --- SLIDERS --- */
@@ -844,7 +848,7 @@
                     <option value="shake-sm">Tremer (Pequeno)</option>
                     <option value="shake-md">Tremer (Médio)</option>
                     <option value="shake-lg">Tremer (Grande)</option>
-                    <option value="glitch-active">Glitch</option>
+                    <!-- <option value="glitch-active">Glitch</option> (REMOVIDO) -->
                 </select>
             </div>
             
@@ -2251,4 +2255,5 @@
     </script>
 </body>
 </html>
+
 
