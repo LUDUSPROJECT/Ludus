@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mesa de RPG Virtual</title>
+    <title>Ludus</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -113,23 +113,6 @@
         @keyframes shake-lg { 0%, 100% { transform: translate(0, 0) rotate(0); } 40% { transform: translate(-10px, 5px) rotate(-5deg); } 80% { transform: translate(10px, -5px) rotate(5deg); } }
         .shake-lg { animation: shake-lg 0.3s infinite; }
         
-        /* Efeito de Movimento: Glitch (REMOVIDO) */
-        /*
-        @keyframes glitch-anim {
-          0% { transform: translate(0); clip-path: inset(0); }
-          5% { transform: translate(-2px, 2px); clip-path: inset(10% 0 85% 0); }
-          10% { transform: translate(2px, -2px); clip-path: inset(90% 0 5% 0); }
-          15% { transform: translate(0); clip-path: inset(0); }
-          85% { transform: translate(0); clip-path: inset(0); }
-          90% { transform: translate(3px, -1px); clip-path: inset(0 0 70% 0); }
-          95% { transform: translate(-3px, 1px); clip-path: inset(40% 0 0 0); }
-          100% { transform: translate(0); clip-path: inset(0); }
-        }
-        .glitch-active {
-          animation: glitch-anim 2s infinite linear alternate-reverse;
-        }
-        */
-
         /* Camada de Imagem (para máscara) */
         .token-image-layer {
             position: absolute;
@@ -143,11 +126,6 @@
             z-index: 1; /* Camada base */
             transition: transform 0.1s ease; /* Para flip/rotate */
         }
-        .glitch-active .token-image-layer {
-            clip-path: inherit; /* Herda o clip-path do token pai */
-        }
-        */
-
 
         /* Camada de Luz Interna (para máscara) */
         .token-light-overlay {
@@ -161,10 +139,6 @@
             mask-position: center;
             mask-repeat: no-repeat;
         }
-        .glitch-active .token-light-overlay {
-            clip-path: inherit; /* Herda o clip-path do token pai */
-        }
-        */
         
         /* Camada de Animação/Efeito (ex: fogo) */
         .token-overlay {
@@ -180,10 +154,6 @@
             z-index: 21; /* Acima da imagem e luz */
             transition: transform 0.1s ease;
         }
-        .glitch-active .token-overlay {
-            clip-path: inherit; /* Herda o clip-path do token pai */
-        }
-        */
 
         
         /* --- SLIDERS --- */
@@ -305,7 +275,7 @@
             opacity: 0;
             transition: opacity 0.2s, transform 0.2s;
             pointer-events: none;
-            z-index: 2000; /* ATUALIZADO: Acima de tudo */
+            z-index: 2000; /* Acima de tudo */
         }
         .group:hover .tooltip {
             opacity: 1;
@@ -489,6 +459,31 @@
         #custom-context-menu button:hover {
             background-color: #6366f1; /* bg-indigo-500 */
         }
+        
+        /* --- NOVO: Painel de Atalhos --- */
+        #shortcuts-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 4500; /* Acima do menu de contexto, abaixo das notificações */
+            background-color: rgba(31, 41, 55, 0.8); /* bg-gray-800/80 */
+            backdrop-filter: blur(10px);
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: white;
+            width: 90%;
+            max-width: 400px;
+        }
+        #shortcuts-modal kbd {
+            background-color: #4b5563; /* bg-gray-600 */
+            border-radius: 0.25rem;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 0.875rem;
+            border-bottom: 2px solid #374151; /* bg-gray-700 */
+        }
 
 
     </style>
@@ -591,6 +586,18 @@
                 <span class="tooltip">Inventário de Objetos (I)</span>
             </button>
         </div>
+        
+        <!-- NOVO: Divisor e Botão de Ajuda -->
+        <hr class="w-10 border-gray-600 my-2">
+        
+        <div class="flex flex-col gap-4">
+            <button id="shortcuts-toggle-btn" class="group relative w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-cyan-500 transition-colors" title="Ajuda / Atalhos (H)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                </svg>
+                <span class="tooltip">Ajuda / Atalhos (H)</span>
+            </button>
+        </div>
     </div>
 
     <!-- Painel Flutuante (Outline) de Controlo do Token -->
@@ -675,7 +682,7 @@
                     </svg>
                     <h4 class="text-lg font-semibold">Estados (Teclas 1-4)</h4>
                 </div>
-                <p class="text-sm text-gray-400 mb-3">Prima 1-4 com o token selecionado para mudar a sua aparência.</p>
+                <p class="text-sm text-gray-400 mb-3">Aperte 1-4 com o token selecionado para mudar a sua aparência.</p>
                 
                 <!-- Grelha de Estados (4 colunas) -->
                 <div class="grid grid-cols-4 gap-2">
@@ -848,7 +855,6 @@
                     <option value="shake-sm">Tremer (Pequeno)</option>
                     <option value="shake-md">Tremer (Médio)</option>
                     <option value="shake-lg">Tremer (Grande)</option>
-                    <!-- <option value="glitch-active">Glitch</option> (REMOVIDO) -->
                 </select>
             </div>
             
@@ -918,7 +924,7 @@
         </div>
     </div>
     
-    <!-- NOVO: Menu de Contexto Personalizado -->
+    <!-- Menu de Contexto Personalizado -->
     <div id="custom-context-menu" class="hidden">
         <button id="ctx-add-token">Adicionar Token</button>
         <button id="ctx-load-map">Carregar Mapa</button>
@@ -927,8 +933,54 @@
         <button id="ctx-toggle-cover">Esconder/Mostrar Mapa</button>
     </div>
 
-    <!-- NOVO: Versão do Build -->
-    <div class="fixed bottom-4 right-4 text-white opacity-30 z-[4900] pointer-events-none hide-on-focus transition-opacity duration-300 font-mono text-sm">[ VER: 0.1.5 ]</div>
+    <!-- Versão do Build -->
+    <div class="fixed bottom-4 right-4 text-white opacity-30 z-[4900] pointer-events-none hide-on-focus transition-opacity duration-300 font-mono text-sm">[ VER: 0.1.6 ]</div>
+
+    <!-- NOVO: Painel de Atalhos -->
+    <div id="shortcuts-modal" class="hidden p-6 hide-on-focus">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Atalhos de Teclado</h3>
+            <button id="close-shortcuts-btn" class="text-gray-400 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <ul class="space-y-3">
+            <li class="flex justify-between items-center">
+                <span>Esconder/Mostrar UI (Modo Sessão)</span>
+                <kbd>F</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Guardar Cena</span>
+                <kbd>G</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Abrir/Fechar Rolador de Dados</span>
+                <kbd>D</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Abrir/Fechar Inventário</span>
+                <kbd>I</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Esconder/Mostrar Mapa</span>
+                <kbd>E</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Abrir/Fechar Ajuda</span>
+                <kbd>H</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Mudar Estado do Token (Selecionado)</span>
+                <kbd>1</kbd> - <kbd>4</kbd>
+            </li>
+            <li class="flex justify-between items-center">
+                <span>Deletar Token (Selecionado)</span>
+                <kbd>Del</kbd>
+            </li>
+        </ul>
+    </div>
 
 
     <script>
@@ -944,6 +996,7 @@
         const tokenInput = document.getElementById('tokenInput');
         const saveStateBtn = document.getElementById('save-state-btn');
         const loadStateInput = document.getElementById('load-state-input');
+        const shortcutsToggleBtn = document.getElementById('shortcuts-toggle-btn'); // NOVO
         
         // Painel de Controlo de Token (Flutuante)
         const scalerUI = document.getElementById('scaler-ui');
@@ -953,7 +1006,7 @@
         const flipHBtn = document.getElementById('flip-h-btn');
         const flipVBtn = document.getElementById('flip-v-btn');
         const rotateBtn = document.getElementById('rotate-btn');
-        const quickDeleteBtn = document.getElementById('quick-delete-btn'); // NOVO
+        const quickDeleteBtn = document.getElementById('quick-delete-btn');
 
         // Painel de Configuração de Token (Lateral Direita)
         const tokenConfigPanel = document.getElementById('token-config-panel');
@@ -1004,6 +1057,10 @@
         
         // Menu de Contexto
         const contextMenu = document.getElementById('custom-context-menu');
+        
+        // NOVO: Painel de Atalhos
+        const shortcutsModal = document.getElementById('shortcuts-modal');
+        const closeShortcutsBtn = document.getElementById('close-shortcuts-btn');
 
         // --- Estado Global ---
         let scale = 1;
@@ -1022,7 +1079,7 @@
 
         // --- Inicialização ---
         // Evita que painéis de UI (dados, botões) ativem o pan/zoom do mapa
-        [uiPanel, scalerUI, tokenConfigPanel, diceRollPanel, inventoryPanel, contextMenu].forEach(panel => {
+        [uiPanel, scalerUI, tokenConfigPanel, diceRollPanel, inventoryPanel, contextMenu, shortcutsModal].forEach(panel => {
             if (panel) {
                 panel.addEventListener('wheel', (e) => e.stopPropagation());
                 panel.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -1752,8 +1809,12 @@
         
         // Esconde o menu se clicar em qualquer outro sítio
         document.addEventListener('click', (e) => {
-            if (!contextMenu.contains(e.target)) {
+            if (contextMenu && !contextMenu.contains(e.target)) {
                 contextMenu.style.display = 'none';
+            }
+            // Esconde o modal de atalhos se clicar fora
+            if (shortcutsModal && !shortcutsModal.contains(e.target) && !shortcutsToggleBtn.contains(e.target)) {
+                shortcutsModal.classList.add('hidden');
             }
         });
         
@@ -1973,9 +2034,7 @@
             if (!selectedToken) return;
 
             // 1. Guarda as configurações atuais (do painel) no token
-            // saveTokenBtn.click(); // Não simula o clique, apenas guarda os dados
-            
-            // --- Cópia manual da lógica de 'saveTokenBtn' ---
+            // Cópia manual da lógica de 'saveTokenBtn'
             selectedToken.dataset.name = tokenNameInput.value;
             const url = animationUrlInput.value.trim();
             applyTokenAnimation(selectedToken, url);
@@ -2003,7 +2062,6 @@
             selectedToken.dataset.lightDistance = lightDistance;
             selectedToken.dataset.lightAngle = lightAngle;
             applyInnerLightEffect(selectedToken, lightActive, lightColor, lightBlur, lightDistance, lightAngle);
-            // --- Fim da cópia ---
             
             // 2. Fecha o painel
             tokenConfigPanel.classList.add('translate-x-full'); 
@@ -2012,15 +2070,13 @@
             // 3. Cria o objeto de dados
             const tokenData = {
                 style: {
-                    // Guardamos as dimensões base, não as escaladas
-                    top: '0px', // Posição será definida no drop
+                    top: '0px',
                     left: '0px',
                     width: `${selectedToken.dataset.baseWidth}px`,
                     height: `${selectedToken.dataset.baseHeight}px`
                 },
                 dataset: { ...selectedToken.dataset }
             };
-            // Reseta a escala para 1, já que guardamos o tamanho base
             tokenData.dataset.scale = 1;
             
             // 4. Adiciona ao inventário
@@ -2142,6 +2198,14 @@
                 console.error("Erro ao largar objeto:", err);
             }
         });
+        
+        // --- Lógica do Painel de Atalhos ---
+        shortcutsToggleBtn.addEventListener('click', () => {
+            shortcutsModal.classList.toggle('hidden');
+        });
+        closeShortcutsBtn.addEventListener('click', () => {
+            shortcutsModal.classList.add('hidden');
+        });
 
         // --- Listener de Teclado Unificado ---
         document.addEventListener('keydown', (e) => {
@@ -2184,6 +2248,11 @@
                 
                 case 'i': // I de Inventário
                     inventoryToggleBtn.click();
+                    e.preventDefault();
+                    return;
+                
+                case 'h': // H de Help/Ajuda
+                    shortcutsModal.classList.toggle('hidden');
                     e.preventDefault();
                     return;
             }
@@ -2255,5 +2324,4 @@
     </script>
 </body>
 </html>
-
 
