@@ -35,10 +35,14 @@
             cursor: grab; /* Indica que o board pode ser "agarrado" */
             z-index: 0; /* Camada base */
         }
-
         #board.panning {
             cursor: grabbing; /* Cursor ao arrastar (pan) */
         }
+        /* Cursor para Adicionar Luz */
+        #board.light-mode {
+            cursor: crosshair;
+        }
+
 
         #canvas-container {
             position: absolute;
@@ -64,6 +68,55 @@
             z-index: 30; /* Acima do mapa e tokens */
             transition: opacity 0.3s ease;
         }
+        
+        /* Camada de Luzes Dinâmicas */
+        #dynamic-light-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Container não bloqueia */
+            z-index: 25; /* Acima dos tokens (20), abaixo da cobertura (30) */
+        }
+        .dynamic-light {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: auto; /* Luzes são clicáveis e arrastáveis */
+            cursor: grab;
+            transition: box-shadow 0.2s, background-color 0.2s, width 0.2s, height 0.2s, transform 0.2s;
+            mix-blend-mode: screen; 
+            opacity: 0.8;
+        }
+        .dynamic-light.selected {
+            border: 2px dashed #0ea5e9;
+        }
+        .dynamic-light:active {
+            cursor: grabbing;
+        }
+        
+        /* Animações de Luz */
+        @keyframes pulse-suave {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+        .pulse-suave { animation: pulse-suave 3s ease-in-out infinite; }
+        
+        @keyframes flicker-vela {
+            0% { opacity: 0.6; } 20% { opacity: 1; } 40% { opacity: 0.7; }
+            60% { opacity: 0.9; } 80% { opacity: 0.6; } 100% { opacity: 0.8; }
+        }
+        .flicker-vela { animation: flicker-vela 1.5s linear infinite; }
+        
+        @keyframes fogueira {
+            0% { opacity: 0.8; transform: scale(1) translate(-50%, -50%); }
+            25% { opacity: 1; transform: scale(1.05) translate(-50%, -50%); }
+            50% { opacity: 0.7; transform: scale(0.95) translate(-50%, -50%); }
+            75% { opacity: 0.9; transform: scale(1.02) translate(-50%, -50%); }
+            100% { opacity: 0.8; transform: scale(1) translate(-50%, -50%); }
+        }
+        .fogueira { animation: fogueira 2s ease-in-out infinite; }
+
 
         .token {
             position: absolute;
@@ -72,18 +125,17 @@
             -webkit-user-select: none;
             -moz-user-select: none;
             transition: outline 0.1s ease-in-out, box-shadow 0.1s ease-in-out, filter 0.2s ease, transform 0s; /* Rotação não deve ser suave */
-            z-index: 20; /* Acima do mapa, abaixo da camada de cobertura */
+            z-index: 20; /* Acima do mapa, abaixo da camada de luz */
             /* Filtros de Aura (drop-shadow) são aplicados aqui via JS */
         }
         
-        .token.dragging {
+        /* Regra de Z-index para arrastar (apenas se a UI estiver visível) */
+        body:not(.ui-hidden) .token.dragging {
             cursor: grabbing;
             z-index: 1000; /* Acima de tudo ao arrastar */
         }
         .token.selected {
-            /* REMOVIDO - A caixa de transformação agora é o feedback */
-            /* outline: 3px solid #0ea5e9; */
-            /* box-shadow: 0 0 15px rgba(14, 165, 233, 0.7); */
+            /* O feedback agora é a caixa de transformação */
         }
         
         /* Esconde a outline se o body tiver a classe 'ui-hidden' */
@@ -119,6 +171,20 @@
         @keyframes shake-lg { 0%, 100% { transform: translate(0, 0) rotate(0); } 40% { transform: translate(-10px, 5px) rotate(-5deg); } 80% { transform: translate(10px, -5px) rotate(5deg); } }
         .shake-lg { animation: shake-lg 0.3s infinite; }
         
+        /* NOVAS Animações de Pulsar */
+        @keyframes pulse-normal {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .pulse-normal { animation: pulse-normal 2s ease-in-out infinite; }
+
+        @keyframes pulse-agitated {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .pulse-agitated { animation: pulse-agitated 1s ease-in-out infinite; }
+        
+
         /* Camada de Imagem (para máscara) */
         .token-image-layer {
             position: absolute;
@@ -537,6 +603,11 @@
             font-size: 0.875rem;
             border-bottom: 2px solid #374151; /* bg-gray-700 */
         }
+        
+        /* Cor de seleção do ícone de Luz */
+        #light-tool-btn.active {
+            background-color: #3b82f6; /* bg-blue-500 */
+        }
 
 
     </style>
@@ -544,7 +615,7 @@
 <body class="bg-gray-900">
 
     <!-- Logo Ludus -->
-    <img id="ludus-logo" src="https://cdn.discordapp.com/attachments/737314796734644335/1434353502326620200/luduslogo.png?ex=6908054b&is=6906b3cb&hm=28c26946ff98f0ffa5cdd3269cdd6b0327544324939f7674c1badba535e18f38&" alt="Ludus Logo" class="fixed top-[18px] left-[80px] w-[60px] h-auto z-50 hide-on-focus transition-opacity duration-300">
+    <img id="ludus-logo" src="https://i.postimg.cc/8c66T6CN/luduslogo.png" alt="Ludus Logo" class="fixed top-[35px] left-[1100px] w-[60px] h-auto z-50 hide-on-focus transition-opacity duration-300">
 
     <!-- Container de Notificações -->
     <div id="notification-container"></div>
@@ -553,6 +624,11 @@
     <div id="board">
         <!-- Container do Mapa e Tokens (para zoom/pan) -->
         <div id="canvas-container">
+            <!-- Camada de Luzes Dinâmicas -->
+            <div id="dynamic-light-container">
+                <!-- Luzes serão adicionadas aqui -->
+            </div>
+            
             <!-- Camada de Esconder Mapa -->
             <canvas id="map-cover-canvas"></canvas>
             
@@ -569,8 +645,8 @@
         </div>
     </div>
 
-    <!-- Painel de UI Moderno (Barra Lateral Esquerda) -->
-    <div id="modern-panel" class="fixed top-0 left-0 h-screen w-16 bg-gray-900 text-white shadow-lg flex flex-col items-center py-4 gap-4 z-100 hide-on-focus transition-opacity duration-300">
+    <!-- Painel de UI Moderno (Flutuante) -->
+    <div id="modern-panel" class="fixed top-4 left-4 h-auto w-16 bg-gray-900/70 backdrop-blur-md border border-white/20 text-white shadow-lg flex flex-col items-center py-4 gap-4 z-100 hide-on-focus transition-opacity duration-300 rounded-2xl">
         
         <!-- Grupo de Ações Principais -->
         <div class="flex flex-col gap-4">
@@ -632,6 +708,15 @@
                 <span class="tooltip">Esconder/Mostrar Mapa (E)</span>
             </button>
             
+            <!-- Ferramenta de Luz -->
+            <button id="light-tool-btn" class="group relative w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-blue-500 transition-colors" title="Adicionar Luz (L)">
+                <!-- ÍCONE ATUALIZADO (Mais simples) -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M12 12a3 3 0 110-6 3 3 0 010 6z" />
+                </svg>
+                <span class="tooltip">Adicionar Luz (L)</span>
+            </button>
+            
             <!-- Rolador de Dados -->
             <button id="dice-toggle-btn" class="group relative w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-purple-600 transition-colors" title="Rolador de Dados (D)">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -665,12 +750,11 @@
 
     <!-- Painel Flutuante (Outline) de Controlo do Token -->
     <div id="scaler-ui" class="hidden fixed z-[50] flex flex-row gap-2 p-1.5 bg-black/20 backdrop-blur-md shadow-lg border border-white/20 rounded-lg hide-on-focus transition-opacity duration-300">
-        <!-- Botões de Escala REMOVIDOS -->
         
         <!-- Ícone de "Ajustes" -->
         <button id="config-token-btn" class="w-8 h-8 bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-purple-600" title="Configurações">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527c.47-.336 1.06-.336 1.53 0l.772.772c.47.47.47 1.23 0 1.7l-.527.737c-.25.35-.272.806-.108 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.11v1.093c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.108 1.204l.527.738c.47.47.47 1.23 0 1.7l-.772.772c-.47.47-1.06.47-1.53 0l-.737-.527c-.35-.25-.806-.272-1.204-.108-.397.165-.71.505-.78.93l-.15.893c-.09.543-.56.94-1.11.94h-1.093c-.55 0-1.02-.397-1.11-.94l-.149-.893c-.07-.425-.383-.765-.78-.93-.398-.165-.854-.143-1.204.108l-.738.527c-.47.47-1.23.47-1.7 0l-.772-.772c-.47-.47-.47-1.23 0-1.7l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.11v-1.093c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.764-.383.93-.78.165-.398.143-.854-.108-1.204l-.527-.738c-.47-.47-.47-1.23 0-1.7l.772-.772c.47-.47 1.06-.47 1.53 0l.737.527c.35.25.807.272 1.204.108.397-.165.71-.505.78-.93l.15-.893zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527c.47-.336 1.06-.336 1.53 0l.772.772c.47.47.47 1.23 0 1.7l-.527.737c-.25.35-.272.806-.108 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.11v1.093c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.108 1.204l.527.738c.47.47.47 1.23 0 1.7l-.772.772c-.47.47-1.06.47-1.53 0l-.737-.527c-.35-.25-.806-.272-1.204-.108-.397.165-.71.505-.78.93l-.15.893c-.09.543-.56.94-1.11.94h-1.093c-.55 0-1.02-.397-1.11-.94l-.149-.893c-.07-.425-.383-.765-.78-.93-.398-.165-.854-.143-1.204.108l-.738.527c-.47.47-1.23.47-1.7 0l-.772-.772c-.47-.47-.47-1.23 0-1.7l.527-.737c.25-.35.272.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.11v-1.093c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.764-.383.93-.78.165-.398.143-.854-.108-1.204l-.527-.738c-.47-.47-.47-1.23 0-1.7l.772-.772c.47-.47 1.06-.47 1.53 0l.737.527c.35.25.807.272 1.204.108.397-.165.71-.505.78-.93l.15-.893zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
             </svg>
         </button>
         
@@ -685,7 +769,6 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 12L3 8m4 8l4-8m1 9l4 4m0 0l4-4m-4 4V4" />
             </svg>
         </button>
-        <!-- Botão de Rotação REMOVIDO -->
         
         <!-- Botão Deletar Rápido -->
         <button id="quick-delete-btn" class="w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-700" title="Deletar Token (Del)">
@@ -695,7 +778,7 @@
         </button>
     </div>
 
-    <!-- Painel de Configurações de Token (Lateral Direita - ESTILO ATUALIZADO) -->
+    <!-- Painel de Configurações de Token (Lateral Direita) -->
     <div id="token-config-panel" class="fixed top-0 right-0 h-screen w-80 bg-gray-900/80 backdrop-blur-md border-l border-white/20 text-white shadow-lg z-[1900] transform translate-x-full transition-transform duration-300 overflow-y-auto hide-on-focus">
         <div class="p-6">
             <!-- Cabeçalho do Painel -->
@@ -891,6 +974,8 @@
                 </div>
                 <select id="token-movement-select" class="mt-2 block w-full rounded-md shadow-sm bg-gray-700 border-gray-600 text-white p-2">
                     <option value="none">Nenhum</option>
+                    <option value="pulse-normal">Pulsar</option>
+                    <option value="pulse-agitated">Pulsar Agitado</option>
                     <option value="breathing-normal">Respiração Normal</option>
                     <option value="breathing-agitated">Respiração Agitada</option>
                     <option value="shake-sm">Tremer (Pequeno)</option>
@@ -927,6 +1012,63 @@
         </div>
     </div>
 
+    <!-- Painel de Configurações de Luz (Lateral Direita) -->
+    <div id="light-config-panel" class="fixed top-0 right-0 h-screen w-80 bg-gray-900/80 backdrop-blur-md border-l border-white/20 text-white shadow-lg z-[1900] transform translate-x-full transition-transform duration-300 overflow-y-auto hide-on-focus">
+        <div class="p-6">
+            <!-- Cabeçalho -->
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Propriedades da Luz</h2>
+                <button id="close-light-panel-btn" class="text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Controles -->
+            <div class="mb-4">
+                <label for="light-color-input" class="block text-sm font-medium text-gray-300 mb-2">Cor da Luz:</label>
+                <input type="color" id="light-color-input" value="#ffffff" class="w-full h-10 bg-gray-700 border-none rounded cursor-pointer">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-400">
+                    <span>Tamanho (Raio)</span>
+                    <span id="light-size-label">150px</span>
+                </div>
+                <input type="range" id="light-size-slider" min="50" max="1000" value="150" class="w-full mt-1">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-400">
+                    <span>Intensidade (Blur)</span>
+                    <span id="light-blur-label">75px</span>
+                </div>
+                <input type="range" id="light-blur-slider" min="20" max="300" value="75" class="w-full mt-1">
+            </div>
+            
+            <!-- Efeito de Animação de Luz -->
+            <div class="mb-4">
+                <label for="light-effect-select" class="block text-sm font-medium text-gray-300 mb-2">Efeito de Animação:</label>
+                <select id="light-effect-select" class="block w-full rounded-md shadow-sm bg-gray-700 border-gray-600 text-white p-2">
+                    <option value="none">Nenhum</option>
+                    <option value="pulse-suave">Pulsar Suave</option>
+                    <option value="flicker-vela">Flicker (Vela)</option>
+                    <option value="fogueira">Fogueira</option>
+                </select>
+            </div>
+
+            <!-- Ações -->
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <button id="delete-light-btn" class="flex items-center gap-2 w-full justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Remover Luz
+                </button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Painel de Rolagem de Dados (Canto Inferior Direito) -->
     <div id="dice-roller-panel" class="hidden fixed bottom-4 right-4 z-110 p-4 bg-gray-800 bg-opacity-70 rounded-lg shadow-lg text-white w-[300px] hide-on-focus transition-opacity duration-300">
         <h4 class="font-bold mb-2">Rolador de Dados</h4>
@@ -944,7 +1086,7 @@
         </div>
     </div>
     
-    <!-- Painel de Inventário de Objetos (Inferior - ESTILO ATUALIZADO) -->
+    <!-- Painel de Inventário de Objetos (Inferior) -->
     <div id="object-inventory-panel" class="fixed bottom-0 left-0 w-full p-4 shadow-lg text-white bg-gray-900/80 backdrop-blur-md transform translate-y-full transition-transform duration-300 z-90 flex flex-col gap-4 hide-on-focus" style="max-height: 40vh;">
         <div class="flex justify-between items-center flex-shrink-0">
             <h4 class="font-bold text-lg">Inventário</h4>
@@ -969,15 +1111,16 @@
         <button id="ctx-add-token">Adicionar Token</button>
         <button id="ctx-load-map">Carregar Mapa</button>
         <button id="ctx-toggle-inventory">Inventário de Objetos</button>
+        <button id="ctx-toggle-lights">Adicionar Luz</button>
         <button id="ctx-toggle-dice">Rolar Dados</button>
         <button id="ctx-toggle-cover">Esconder/Mostrar Mapa</button>
     </div>
 
     <!-- Versão do Build -->
-    <div class="fixed bottom-4 right-4 text-white opacity-30 z-[4900] pointer-events-none hide-on-focus transition-opacity duration-300 font-mono text-sm">[ VER: 0.1.7 ]</div>
+    <div class="fixed bottom-4 right-4 text-white opacity-30 z-[4900] pointer-events-none hide-on-focus transition-opacity duration-300 font-mono text-sm">[ VER: 0.1.8 ]</div>
 
     <!-- Painel de Atalhos -->
-    <div id="shortcuts-modal" class="hidden p-6 hide-on-focus">
+    <div id="shortcuts-modal" class="hidden p-6 hide-on-focus z-[4500]">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-bold">Atalhos de Teclado</h3>
             <button id="close-shortcuts-btn" class="text-gray-400 hover:text-white">
@@ -1008,6 +1151,10 @@
                 <kbd>E</kbd>
             </li>
             <li class="flex justify-between items-center">
+                <span>Modo Adicionar Luz</span>
+                <kbd>L</kbd>
+            </li>
+            <li class="flex justify-between items-center">
                 <span>Abrir/Fechar Ajuda</span>
                 <kbd>H</kbd>
             </li>
@@ -1016,7 +1163,7 @@
                 <kbd>1</kbd> - <kbd>4</kbd>
             </li>
             <li class="flex justify-between items-center">
-                <span>Deletar Token (Selecionado)</span>
+                <span>Deletar Item (Selecionado)</span>
                 <kbd>Del</kbd>
             </li>
         </ul>
@@ -1037,15 +1184,13 @@
         const saveStateBtn = document.getElementById('save-state-btn');
         const loadStateInput = document.getElementById('load-state-input');
         const shortcutsToggleBtn = document.getElementById('shortcuts-toggle-btn');
+        const lightToolBtn = document.getElementById('light-tool-btn');
         
         // Painel de Controlo de Token (Flutuante)
         const scalerUI = document.getElementById('scaler-ui');
-        // const scaleUpBtn = document.getElementById('scale-up'); // Removido
-        // const scaleDownBtn = document.getElementById('scale-down'); // Removido
         const configTokenBtn = document.getElementById('config-token-btn');
         const flipHBtn = document.getElementById('flip-h-btn');
         const flipVBtn = document.getElementById('flip-v-btn');
-        // const rotateBtn = document.getElementById('rotate-btn'); // Removido
         const quickDeleteBtn = document.getElementById('quick-delete-btn');
 
         // Painel de Configuração de Token (Lateral Direita)
@@ -1104,6 +1249,19 @@
         // Painel de Atalhos
         const shortcutsModal = document.getElementById('shortcuts-modal');
         const closeShortcutsBtn = document.getElementById('close-shortcuts-btn');
+        
+        // Luzes Dinâmicas
+        const lightContainer = document.getElementById('dynamic-light-container');
+        const lightConfigPanel = document.getElementById('light-config-panel');
+        const closeLightPanelBtn = document.getElementById('close-light-panel-btn');
+        const lightColorInput = document.getElementById('light-color-input');
+        const lightSizeSlider = document.getElementById('light-size-slider');
+        const lightBlurSlider = document.getElementById('light-blur-slider');
+        const lightSizeLabel = document.getElementById('light-size-label');
+        const lightBlurLabel = document.getElementById('light-blur-label');
+        const lightEffectSelect = document.getElementById('light-effect-select');
+        const deleteLightBtn = document.getElementById('delete-light-btn');
+
 
         // --- Estado Global ---
         let scale = 1;
@@ -1111,7 +1269,9 @@
         let originY = 0;
         let isPanning = false;
         let selectedToken = null; 
+        let selectedLight = null;
         let objectInventory = []; // Armazena os objetos guardados
+        let isLightMode = false;
         
         let isTransforming = false;
         let transformAction = '';
@@ -1122,7 +1282,54 @@
         let currentModalState = {}; // Armazena temporariamente os estados do modal
 
         
-        // --- Lógica da Caixa de Transformação (MOVIDA PARA CIMA) ---
+        // --- Funções Auxiliares de Base (Definidas Primeiro) ---
+
+        function getEventCoords(e) {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        }
+        
+        function showNotification(message, type = "success") {
+            const notif = document.createElement('div');
+            notif.className = `notification ${type}`;
+            notif.textContent = message;
+            notificationContainer.appendChild(notif);
+            
+            // Remove a notificação após a animação
+            setTimeout(() => {
+                notif.remove();
+            }, 3000);
+        }
+        
+        function updateScalerUIPosition() {
+            if (!selectedToken || !scalerUI) return;
+            
+            // Ajusta a posição da UI flutuante
+            const transformBoxRect = transformBox.getBoundingClientRect();
+            if (transformBoxRect.top) {
+                 scalerUI.style.left = `${transformBoxRect.right + 10}px`; // 10px à direita
+                 scalerUI.style.top = `${transformBoxRect.top + transformBoxRect.height / 2 - scalerUI.offsetHeight / 2}px`; // Centralizado verticalmente
+            } else {
+                const tokenRect = selectedToken.getBoundingClientRect();
+                 scalerUI.style.left = `${tokenRect.right + 10}px`; 
+                 scalerUI.style.top = `${tokenRect.top + tokenRect.height / 2 - scalerUI.offsetHeight / 2}px`;
+            }
+        }
+        
+        function applyTokenTransform(token) {
+            if (!token) return;
+            // Aplica às 3 camadas internas
+            const layers = token.querySelectorAll('.token-image-layer, .token-light-overlay, .token-overlay');
+            const transform = `scale(${token.dataset.scaleX || 1}, ${token.dataset.scaleY || 1})`;
+            layers.forEach(layer => {
+                layer.style.transform = transform;
+            });
+        }
+        
+        
+        // --- Lógica da Caixa de Transformação ---
         
         function showTransformBox(token) {
             if (!token || document.body.classList.contains('ui-hidden')) {
@@ -1139,7 +1346,9 @@
         }
         
         function hideTransformBox() {
-            transformBox.style.display = 'none';
+            if (transformBox) {
+                transformBox.style.display = 'none';
+            }
         }
 
         function startTransform(e) {
@@ -1270,7 +1479,7 @@
 
         // --- Inicialização ---
         // Evita que painéis de UI (dados, botões) ativem o pan/zoom do mapa
-        [uiPanel, scalerUI, tokenConfigPanel, diceRollPanel, inventoryPanel, contextMenu, shortcutsModal, transformBox].forEach(panel => {
+        [uiPanel, scalerUI, tokenConfigPanel, lightConfigPanel, diceRollPanel, inventoryPanel, contextMenu, shortcutsModal, transformBox].forEach(panel => {
             if (panel) {
                 panel.addEventListener('wheel', (e) => e.stopPropagation());
                 panel.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -1278,7 +1487,7 @@
         });
         
         // Listener para a caixa de transformação
-        transformBox.addEventListener('mousedown', startTransform); // (Esta linha estava a dar erro, agora está correta)
+        transformBox.addEventListener('mousedown', startTransform);
 
 
         // --- Lógica de Mapa e Token ---
@@ -1314,12 +1523,6 @@
             e.target.value = null; // Limpa para permitir carregar de novo
         });
 
-        /**
-         * Cria um novo token no tabuleiro.
-         * @param {string} url - A URL da imagem (pode ser Data URL ou URL normal)
-         * @param {object} tokenData - Dados do token (ao carregar de cena/inventário)
-         * @param {boolean} isDataURL - Flag se a URL é uma Data URL (para novos tokens)
-         */
         function createToken(url, tokenData = null, isDataURL = false) {
             const token = document.createElement('div');
             token.className = 'token';
@@ -1379,7 +1582,7 @@
                 token.dataset.rotateZ = tokenData.dataset.rotateZ || 0;
 
                 applyMovementEffect(token, token.dataset.movement);
-                applyTokenAura(token, token.dataset.auraActive, token.dataset.auraColor, token.dataset.auraSize);
+                applyTokenFilters(token); // Aplica aura
                 applyInnerLightEffect(token, token.dataset.lightActive, token.dataset.lightColor, token.dataset.lightBlur, token.dataset.lightDistance, token.dataset.lightAngle);
                 
                 // Aplica transformações (Rotação e Flip)
@@ -1422,6 +1625,8 @@
 
                     addTokenEventListeners(token);
                     canvasContainer.appendChild(token);
+                    
+                    applyTokenFilters(token); // Aplica filtros (necessário para sombras dinâmicas)
                 };
                 img.src = url; // url é Data URL aqui
             }
@@ -1439,7 +1644,7 @@
             // Camada de Luz já está no createToken
         }
 
-        // --- Lógica de Arrastar e Rodar Token ---
+        // --- Lógica de Arrastar ---
         let activeToken = null;
         let lastTouchCoords = null; 
 
@@ -1497,6 +1702,8 @@
 
             activeToken.style.left = `${currentLeft + worldDeltaX}px`;
             activeToken.style.top = `${currentTop + worldDeltaY}px`;
+            
+            applyTokenFilters(activeToken); // Atualiza filtros (sombra)
 
             if (selectedToken === activeToken) {
                 updateScalerUIPosition();
@@ -1520,6 +1727,9 @@
 
         function selectToken(token) {
             if (isTransforming) return; // Não troca a seleção se estiver a escalar/rodar
+            
+            // Deseleciona luz
+            deselectAllLights();
             
             if (selectedToken && selectedToken !== token) {
                 selectedToken.classList.remove('selected');
@@ -1550,54 +1760,9 @@
             
             // Esconde a caixa de transformação
             hideTransformBox();
-        }
-
-        function updateScalerUIPosition() {
-            if (!selectedToken || !scalerUI) return;
             
-            // Ajusta a posição da UI flutuante
-            // Tenta posicionar 10px à DIREITA da caixa de transformação
-            const transformBoxRect = transformBox.getBoundingClientRect();
-            if (transformBoxRect.top) {
-                 scalerUI.style.left = `${transformBoxRect.right + 10}px`; // 10px à direita
-                 scalerUI.style.top = `${transformBoxRect.top + transformBoxRect.height / 2 - scalerUI.offsetHeight / 2}px`; // Centralizado verticalmente
-            } else {
-                // Fallback se a caixa não estiver visível
-                const tokenRect = selectedToken.getBoundingClientRect();
-                 scalerUI.style.left = `${tokenRect.right + 10}px`; 
-                 scalerUI.style.top = `${tokenRect.top + tokenRect.height / 2 - scalerUI.offsetHeight / 2}px`;
-            }
-        }
-
-        // Esta função agora é chamada apenas internamente (ex: carregar cena)
-        function scaleTokenInternally(token, newScale) {
-            const oldWidth = parseFloat(token.style.width);
-            const oldHeight = parseFloat(token.style.height);
-
-            const baseWidth = parseFloat(token.dataset.baseWidth);
-            const baseHeight = parseFloat(token.dataset.baseHeight);
-
-            newScale = Math.max(0.1, Math.min(newScale, 10)); // Limita
-            token.dataset.scale = newScale;
-
-            const newWidth = baseWidth * newScale;
-            const newHeight = baseHeight * newScale;
-            token.style.width = `${newWidth}px`;
-            token.style.height = `${newHeight}px`;
-
-            // Ajusta a posição para que escale do centro
-            const deltaW = newWidth - oldWidth;
-            const deltaH = newHeight - oldHeight;
-            const currentLeft = parseFloat(token.style.left);
-            const currentTop = parseFloat(token.style.top);
-
-            token.style.left = `${currentLeft - deltaW / 2}px`;
-            token.style.top = `${currentTop - deltaH / 2}px`;
-
-            if (token === selectedToken) {
-                updateScalerUIPosition();
-                showTransformBox(token); // Atualiza a caixa
-            }
+            // Deseleciona luzes também
+            deselectAllLights();
         }
         
         flipHBtn.addEventListener('click', (e) => {
@@ -1626,17 +1791,6 @@
             }
         });
         
-        function applyTokenTransform(token) {
-            if (!token) return;
-            // Aplica às 3 camadas internas
-            const layers = token.querySelectorAll('.token-image-layer, .token-light-overlay, .token-overlay');
-            const transform = `scale(${token.dataset.scaleX || 1}, ${token.dataset.scaleY || 1})`;
-            layers.forEach(layer => {
-                layer.style.transform = transform;
-            });
-        }
-
-
         scalerUI.addEventListener('mousedown', (e) => e.stopPropagation());
 
         // --- Lógica do Painel de Configuração de Token (Lateral Direita) ---
@@ -1677,7 +1831,6 @@
                 selectedToken.dataset.auraActive = auraActive;
                 selectedToken.dataset.auraColor = auraColor;
                 selectedToken.dataset.auraSize = auraSize;
-                applyTokenAura(selectedToken, auraActive, auraColor, auraSize);
                 
                 // Guarda Efeitos (Luz Interna)
                 const lightActive = tokenLightToggle.checked.toString();
@@ -1692,7 +1845,9 @@
                 selectedToken.dataset.lightAngle = lightAngle;
                 applyInnerLightEffect(selectedToken, lightActive, lightColor, lightBlur, lightDistance, lightAngle);
                 
-                // As transformações (flip/rotate) já estão guardadas no dataset
+                // Guarda Efeitos (Sombra) - REMOVIDO
+                
+                applyTokenFilters(selectedToken); // Atualiza filtros combinados
                 
                 showNotification("Token guardado!", "success");
             }
@@ -1760,6 +1915,8 @@
             tokenLightBlurLabel.textContent = `${tokenLightBlur.value}px`;
             tokenLightDistanceLabel.textContent = `${tokenLightDistance.value}px`;
             tokenLightAngleLabel.textContent = `${tokenLightAngle.value}°`;
+            
+            // Preenche Sombra (REMOVIDO)
 
             tokenConfigPanel.classList.remove('translate-x-full'); 
             tokenConfigPanel.classList.add('translate-x-0');
@@ -1790,22 +1947,32 @@
         
         function applyMovementEffect(token, movementValue) {
             // Remove todas as classes de movimento primeiro
-            token.classList.remove('shake-sm', 'shake-md', 'shake-lg', 'breathing-normal', 'breathing-agitated');
+            token.classList.remove('shake-sm', 'shake-md', 'shake-lg', 'breathing-normal', 'breathing-agitated', 'pulse-normal', 'pulse-agitated');
             if (movementValue !== 'none') {
                 token.classList.add(movementValue);
             }
         }
         
-        function applyTokenAura(token, active, color, size) {
-            // Usa drop-shadow no token principal
-            if (active === 'true') {
+        // Combina Aura e Sombra Dinâmica
+        function applyTokenFilters(token) {
+            if (!token) return;
+
+            let filters = [];
+            
+            // Aura (Externa)
+            if (token.dataset.auraActive === 'true') {
+                const color = token.dataset.auraColor || '#ffffff';
+                const size = token.dataset.auraSize || '10';
                 const blurRadius = `${size}px`;
-                // Aplica uma sombra múltipla para um efeito mais "denso"
-                token.style.filter = `drop-shadow(0 0 ${blurRadius} ${color}) drop-shadow(0 0 ${parseFloat(blurRadius)/2}px ${color})`;
-            } else {
-                token.style.filter = 'none'; // Remove o filtro
+                filters.push(`drop-shadow(0 0 ${blurRadius} ${color})`);
+                filters.push(`drop-shadow(0 0 ${parseFloat(blurRadius)/2}px ${color})`);
             }
+            
+            // Sombra (REMOVIDO)
+            
+            token.style.filter = filters.join(' ');
         }
+        
         
         function applyInnerLightEffect(token, active, color, blur, distance, angle) {
             const overlay = token.querySelector('.token-light-overlay');
@@ -1826,14 +1993,23 @@
         // --- Listeners de Efeitos (Atualização em Tempo Real) ---
 
         tokenAuraToggle.addEventListener('input', (e) => {
-             if(selectedToken) applyTokenAura(selectedToken, e.target.checked.toString(), tokenAuraColor.value, tokenAuraSize.value);
+             if(selectedToken) {
+                 selectedToken.dataset.auraActive = e.target.checked.toString();
+                 applyTokenFilters(selectedToken);
+             }
         });
         tokenAuraColor.addEventListener('input', (e) => {
-             if(selectedToken) applyTokenAura(selectedToken, tokenAuraToggle.checked.toString(), e.target.value, tokenAuraSize.value);
+             if(selectedToken) {
+                 selectedToken.dataset.auraColor = e.target.value;
+                 applyTokenFilters(selectedToken);
+             }
         });
         tokenAuraSize.addEventListener('input', (e) => {
              tokenAuraSizeLabel.textContent = `${e.target.value}px`;
-             if(selectedToken) applyTokenAura(selectedToken, tokenAuraToggle.checked.toString(), tokenAuraColor.value, e.target.value);
+             if(selectedToken) {
+                 selectedToken.dataset.auraSize = e.target.value;
+                 applyTokenFilters(selectedToken);
+             }
         });
 
         tokenMovementSelect.addEventListener('input', (e) => {
@@ -1867,6 +2043,8 @@
             tokenLightAngleLabel.textContent = `${e.target.value}°`;
             updateInnerLight();
         });
+        
+        // Listeners Sombra (REMOVIDO)
 
         // --- Listeners para Upload de Estados de Token ---
         document.querySelectorAll('.state-file-input').forEach(input => {
@@ -1911,8 +2089,20 @@
 
         // --- Lógica de Pan (Arrastar Mapa) e Zoom ---
         board.addEventListener('click', (e) => {
+            // Verifica se o clique foi diretamente no board ou no container
             if (e.target === board || e.target === canvasContainer) {
-                deselectAll();
+                
+                // Se estiver no modo de luz, adiciona luz
+                if (isLightMode && !document.body.classList.contains('ui-hidden')) {
+                    const rect = canvasContainer.getBoundingClientRect();
+                    const x = (e.clientX - rect.left - originX) / scale;
+                    const y = (e.clientY - rect.top - originY) / scale;
+                    createDynamicLight(x, y);
+                } else {
+                    // Se não, deseleciona tudo
+                    deselectAll();
+                }
+                
             }
             contextMenu.style.display = 'none'; // Esconde menu de contexto
         });
@@ -1932,7 +2122,7 @@
             e.preventDefault(); // Impede o menu padrão
             
             // Se estiver sobre um token, não mostra o menu do mapa
-            if (e.target.closest('.token') || e.target.closest('#transform-box')) {
+            if (e.target.closest('.token') || e.target.closest('#transform-box') || e.target.closest('.dynamic-light')) {
                 return;
             }
 
@@ -1965,6 +2155,11 @@
             inventoryToggleBtn.click(); // Simula clique no botão
             contextMenu.style.display = 'none';
         });
+        document.getElementById('ctx-toggle-lights').addEventListener('click', () => {
+            if (document.body.classList.contains('ui-hidden')) return; // Bloqueia no modo oculto
+            lightToolBtn.click(); // Simula clique no botão
+            contextMenu.style.display = 'none';
+        });
         document.getElementById('ctx-toggle-dice').addEventListener('click', () => {
             diceToggleBtn.click(); // Simula clique no botão
             contextMenu.style.display = 'none';
@@ -1977,17 +2172,22 @@
 
 
         document.addEventListener('mousemove', (e) => {
-            if (!isPanning) return;
-            
-            originX += e.movementX;
-            originY += e.movementY;
-            updateCanvasTransform();
+            if (isPanning) {
+                originX += e.movementX;
+                originY += e.movementY;
+                updateCanvasTransform();
+            } else if (isDragLight) {
+                dragLight(e);
+            }
         });
 
         document.addEventListener('mouseup', (e) => {
             if (isPanning && e.button === 1) {
                 isPanning = false;
                 board.classList.remove('panning');
+            }
+            if (isDragLight) {
+                endDragLight(e);
             }
         });
         
@@ -2022,6 +2222,7 @@
         saveStateBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const allTokens = document.querySelectorAll('.token');
+            const allLights = document.querySelectorAll('.dynamic-light');
             const state = {
                 map: {
                     url: canvasContainer.style.backgroundImage,
@@ -2029,7 +2230,8 @@
                     height: canvasContainer.style.height
                 },
                 inventory: objectInventory, 
-                tokens: []
+                tokens: [],
+                lights: []
             };
 
             allTokens.forEach(token => {
@@ -2041,6 +2243,17 @@
                         height: token.style.height
                     },
                     dataset: { ...token.dataset }
+                });
+            });
+            
+            allLights.forEach(light => {
+                state.lights.push({
+                    top: light.style.top,
+                    left: light.style.left,
+                    size: light.dataset.size,
+                    blur: light.dataset.blur,
+                    color: light.dataset.color,
+                    effect: light.dataset.effect || 'none'
                 });
             });
 
@@ -2078,6 +2291,7 @@
         function loadState(state) {
             // Limpa o tabuleiro
             document.querySelectorAll('.token').forEach(t => t.remove());
+            document.querySelectorAll('.dynamic-light').forEach(l => l.remove());
             deselectAll();
             
             // Carrega o Mapa
@@ -2094,9 +2308,15 @@
             // Carrega os Tokens
             if (state.tokens) {
                 state.tokens.forEach(tokenData => {
-                    // A imagem principal está no dataset.state1 ou na style.backgroundImage (legacy)
                     const imgUrl = tokenData.dataset.state1 || tokenData.style.backgroundImage;
                     createToken(imgUrl, tokenData);
+                });
+            }
+            
+            // Carrega as Luzes
+            if (state.lights) {
+                state.lights.forEach(lightData => {
+                    createDynamicLight(0, 0, lightData); // Posição será sobrescrita
                 });
             }
             
@@ -2118,13 +2338,7 @@
                 mapCoverCanvas.style.opacity = '1';
                 // E também esconde o painel de dados e a UI de escala
                 diceRollPanel.classList.add('hidden');
-                scalerUI.classList.add('hidden');
-                // Deseleciona o token para que a UI não reapareça
-                if (selectedToken) {
-                    selectedToken.classList.remove('selected');
-                    selectedToken = null;
-                }
-                hideTransformBox(); // Esconde a caixa
+                deselectAll(); // Deseleciona tokens e luzes
             } else {
                 // Mostra o mapa/tokens
                 mapCoverCanvas.style.opacity = '0';
@@ -2185,7 +2399,7 @@
             selectedToken.dataset.auraActive = auraActive;
             selectedToken.dataset.auraColor = auraColor;
             selectedToken.dataset.auraSize = auraSize;
-            applyTokenAura(selectedToken, auraActive, auraColor, auraSize);
+            applyTokenFilters(selectedToken); // Aplica aura
             const lightActive = tokenLightToggle.checked.toString();
             const lightColor = tokenLightColor.value;
             const lightBlur = tokenLightBlur.value;
@@ -2331,9 +2545,219 @@
 
             } catch (err) {
                 console.error("Erro ao largar objeto:", err);
-D
             }
         });
+        
+        // --- Lógica das Luzes Dinâmicas ---
+        
+        lightToolBtn.addEventListener('click', () => {
+            if (document.body.classList.contains('ui-hidden')) return; // Bloqueia no modo oculto
+            isLightMode = !isLightMode;
+            board.classList.toggle('light-mode', isLightMode);
+            lightToolBtn.classList.toggle('active', isLightMode);
+        });
+        
+        function createDynamicLight(x, y, data = null) {
+            const light = document.createElement('div');
+            light.className = 'dynamic-light';
+            
+            if (data) {
+                // Carregando de um save
+            } else {
+                data = {
+                    left: `${x}px`, 
+                    top: `${y}px`, 
+                    size: '150',
+                    blur: '75',
+                    color: '#ffffff',
+                    effect: 'none'
+                };
+            }
+            
+            light.dataset.size = data.size;
+            light.dataset.blur = data.blur;
+            light.dataset.color = data.color;
+            light.dataset.effect = data.effect;
+            light.style.left = data.left;
+            light.style.top = data.top;
+            
+            applyLightEffect(light);
+            applyLightAnimation(light, data.effect);
+            
+            // Eventos de arrastar
+            light.addEventListener('mousedown', startDragLight);
+            light.addEventListener('touchstart', startDragLight, { passive: false });
+            
+            // Evento de selecionar
+            light.addEventListener('click', (e) => {
+                if (document.body.classList.contains('ui-hidden')) return; // Bloqueia no modo oculto
+                e.stopPropagation();
+                selectLight(light);
+            });
+            
+            lightContainer.appendChild(light);
+            return light;
+        }
+
+        function applyLightEffect(light) {
+            const size = light.dataset.size;
+            const blur = light.dataset.blur;
+            const color = light.dataset.color;
+            
+            light.style.width = `${size}px`;
+            light.style.height = `${size}px`;
+            light.style.backgroundColor = color;
+            light.style.boxShadow = `0 0 ${blur}px ${blur}px ${color}`;
+            
+            // Centraliza no cursor (ajuste de offset)
+            const offset = parseFloat(size) / 2;
+            light.style.transform = `translate(-${offset}px, -${offset}px)`;
+        }
+        
+        function applyLightAnimation(light, effectValue) {
+            light.classList.remove('pulse-suave', 'flicker-vela', 'fogueira');
+            if (effectValue && effectValue !== 'none') {
+                light.classList.add(effectValue);
+            }
+        }
+
+
+        function selectLight(light) {
+            // Deseleciona o token, se houver
+            deselectAll();
+            
+            if (selectedLight && selectedLight !== light) {
+                selectedLight.classList.remove('selected');
+            }
+            selectedLight = light;
+            selectedLight.classList.add('selected');
+            
+            // Preenche o painel
+            lightColorInput.value = light.dataset.color;
+            lightSizeSlider.value = light.dataset.size;
+            lightBlurSlider.value = light.dataset.blur;
+            lightSizeLabel.textContent = `${light.dataset.size}px`;
+            lightBlurLabel.textContent = `${light.dataset.blur}px`;
+            lightEffectSelect.value = light.dataset.effect || 'none';
+            
+            // Mostra o painel
+            lightConfigPanel.classList.remove('translate-x-full');
+            lightConfigPanel.classList.add('translate-x-0');
+        }
+        
+        function deselectAllLights() {
+             if (selectedLight) {
+                selectedLight.classList.remove('selected');
+            }
+            selectedLight = null;
+            lightConfigPanel.classList.add('translate-x-full'); 
+            lightConfigPanel.classList.remove('translate-x-0');
+        }
+        
+        // Listeners do painel de luz
+        closeLightPanelBtn.addEventListener('click', deselectAllLights);
+        
+        deleteLightBtn.addEventListener('click', () => {
+            if (selectedLight) {
+                selectedLight.remove();
+                deselectAllLights();
+                showNotification("Luz removida", "error");
+            }
+        });
+        
+        lightColorInput.addEventListener('input', (e) => {
+            if(selectedLight) {
+                selectedLight.dataset.color = e.target.value;
+                applyLightEffect(selectedLight);
+            }
+        });
+        lightSizeSlider.addEventListener('input', (e) => {
+            if(selectedLight) {
+                selectedLight.dataset.size = e.target.value;
+                lightSizeLabel.textContent = `${e.target.value}px`;
+                applyLightEffect(selectedLight);
+            }
+        });
+        lightBlurSlider.addEventListener('input', (e) => {
+            if(selectedLight) {
+                selectedLight.dataset.blur = e.target.value;
+                lightBlurLabel.textContent = `${e.target.value}px`;
+                applyLightEffect(selectedLight);
+            }
+        });
+        
+        lightEffectSelect.addEventListener('input', (e) => {
+            if(selectedLight) {
+                selectedLight.dataset.effect = e.target.value;
+                applyLightAnimation(selectedLight, e.target.value);
+            }
+        });
+
+        
+        // Arrastar Luz
+        let activeLight = null;
+        let isDragLight = false;
+        function startDragLight(e) {
+            if (document.body.classList.contains('ui-hidden')) return; // Bloqueia no modo oculto
+            e.stopPropagation();
+            // Ignora se for botão do meio
+            if (e.button === 1) return;
+            
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+                lastTouchCoords = getEventCoords(e);
+            }
+            else e.preventDefault();
+            
+            activeLight = e.target.closest('.dynamic-light');
+            if (!activeLight) return;
+
+            activeLight.style.cursor = 'grabbing';
+            isDragLight = true;
+            selectLight(activeLight);
+        }
+        
+        function dragLight(e) {
+            if (!activeLight || !isDragLight) return;
+
+            let movementX = 0;
+            let movementY = 0;
+
+            if (e.type === 'touchmove') {
+                e.preventDefault();
+                const coords = getEventCoords(e);
+                if (lastTouchCoords) {
+                    movementX = coords.x - lastTouchCoords.x;
+                    movementY = coords.y - lastTouchCoords.y;
+                }
+                lastTouchCoords = coords;
+            } else {
+                movementX = e.movementX;
+                movementY = e.movementY;
+            }
+            
+            const worldDeltaX = movementX / scale;
+            const worldDeltaY = movementY / scale;
+
+            const currentLeft = parseFloat(activeLight.style.left);
+            const currentTop = parseFloat(activeLight.style.top);
+
+            activeLight.style.left = `${currentLeft + worldDeltaX}px`;
+            activeLight.style.top = `${currentTop + worldDeltaY}px`;
+            
+            // Atualiza sombras
+            applyTokenFilters(); 
+        }
+
+        function endDragLight(e) {
+            if (activeLight) {
+                activeLight.style.cursor = 'grab';
+            }
+            activeLight = null;
+            isDragLight = false;
+            lastTouchCoords = null;
+        }
+
         
         // --- Lógica do Painel de Atalhos ---
         shortcutsToggleBtn.addEventListener('click', () => {
@@ -2349,6 +2773,8 @@ D
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') {
                 return;
             }
+            
+            if (isTransforming) return; // Ignora atalhos enquanto transforma
 
             const key = e.key.toLowerCase();
 
@@ -2359,11 +2785,14 @@ D
                     if (document.body.classList.contains('ui-hidden')) {
                         scalerUI.classList.add('hidden'); 
                         hideTransformBox(); // Esconde a caixa
+                        deselectAllLights(); // Esconde painel de luz
                     } else {
                         if (selectedToken) {
                             scalerUI.classList.remove('hidden');
                             updateScalerUIPosition();
                             showTransformBox(selectedToken); // Mostra a caixa
+                        } else if (selectedLight) {
+                            selectLight(selectedLight); // Mostra painel de luz
                         }
                     }
                     e.preventDefault(); // Evita o "Find" do browser
@@ -2389,6 +2818,12 @@ D
                     e.preventDefault();
                     return;
                 
+                case 'l': // L de Luz
+                    if (document.body.classList.contains('ui-hidden')) return; // Bloqueia no modo oculto
+                    lightToolBtn.click();
+                    e.preventDefault();
+                    return;
+                
                 case 'h': // H de Help/Ajuda
                     shortcutsModal.classList.toggle('hidden');
                     e.preventDefault();
@@ -2396,7 +2831,7 @@ D
             }
 
             // Atalhos que dependem de um TOKEN SELECIONADO
-            if (selectedToken && !isTransforming) { // Não faz nada se estiver a transformar
+            if (selectedToken) {
                 const keyNum = parseInt(key);
                 // Verifica se a tecla é um número entre 1 e 4
                 if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 4) {
@@ -2425,6 +2860,13 @@ D
                     quickDeleteBtn.click(); // Simula o clique no novo botão vermelho
                 }
             }
+            
+            // Atalho para Deletar LUZ
+            if (selectedLight && key === 'delete') {
+                if (document.body.classList.contains('ui-hidden')) return; // Bloqueia no modo oculto
+                e.preventDefault();
+                deleteLightBtn.click();
+            }
         });
         
         // --- Funções Auxiliares ---
@@ -2437,25 +2879,8 @@ D
                 }
                 showTransformBox(selectedToken); // Atualiza a caixa no pan/zoom
             }
-        }
-
-        function getEventCoords(e) {
-            if (e.touches && e.touches.length > 0) {
-                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            }
-            return { x: e.clientX, y: e.clientY };
-        }
-        
-        function showNotification(message, type = "success") {
-            const notif = document.createElement('div');
-            notif.className = `notification ${type}`;
-            notif.textContent = message;
-            notificationContainer.appendChild(notif);
-            
-            // Remove a notificação após a animação
-            setTimeout(() => {
-                notif.remove();
-            }, 3000);
+            // Atualiza sombras (REMOVIDO, agora só no drag do token/luz)
+            // applyTokenFilters();
         }
 
         // --- Inicialização ---
@@ -2465,5 +2890,4 @@ D
     </script>
 </body>
 </html>
-
 
